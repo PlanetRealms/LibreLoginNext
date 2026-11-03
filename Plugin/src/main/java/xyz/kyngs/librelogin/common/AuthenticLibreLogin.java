@@ -92,6 +92,7 @@ import xyz.kyngs.librelogin.common.config.HoconPluginConfiguration;
 import xyz.kyngs.librelogin.common.crypto.Argon2IDCryptoProvider;
 import xyz.kyngs.librelogin.common.crypto.BCrypt2ACryptoProvider;
 import xyz.kyngs.librelogin.common.crypto.LegacyMessageDigestCryptoProvider;
+import xyz.kyngs.librelogin.common.crypto.NavAuthPBKDF2CryptoProvider;
 import xyz.kyngs.librelogin.common.crypto.PBKDF2CryptoProvider;
 import xyz.kyngs.librelogin.common.crypto.SCryptCryptoProvider;
 import xyz.kyngs.librelogin.common.crypto.VerifyOnlyCryptoProvider;
@@ -117,6 +118,7 @@ import xyz.kyngs.librelogin.common.migrate.AuthMeSQLMigrateReadProvider;
 import xyz.kyngs.librelogin.common.migrate.FastLoginSQLMigrateReadProvider;
 import xyz.kyngs.librelogin.common.migrate.LibreLoginSQLMigrateReadProvider;
 import xyz.kyngs.librelogin.common.migrate.LoginToSQLMigrateReadProvider;
+import xyz.kyngs.librelogin.common.migrate.NavAuthSQLMigrateReadProvider;
 import xyz.kyngs.librelogin.common.premium.AuthenticPremiumProvider;
 import xyz.kyngs.librelogin.common.redis.RedisService;
 import xyz.kyngs.librelogin.common.server.AuthenticServerHandler;
@@ -506,11 +508,13 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
         registerCryptoProvider(new BCrypt2ACryptoProvider());
         registerCryptoProvider(new SCryptCryptoProvider());
         registerCryptoProvider(new PBKDF2CryptoProvider());
-        // Verify-only: imported AuthMe / LibreLogin hashes, re-hashed on the next successful login.
+        // Verify-only: imported AuthMe / LibreLogin / NavAuth hashes, re-hashed on the next
+        // successful login.
         registerCryptoProvider(new LegacyMessageDigestCryptoProvider("SHA-256", "SHA-256", false));
         registerCryptoProvider(new LegacyMessageDigestCryptoProvider("SHA-512", "SHA-512", false));
         registerCryptoProvider(
                 new LegacyMessageDigestCryptoProvider("LOGIT-SHA-256", "SHA-256", true));
+        registerCryptoProvider(new NavAuthPBKDF2CryptoProvider());
 
         setupDB();
 
@@ -915,6 +919,22 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
                                 new LoginToSQLMigrateReadProvider(
                                         "LoginTo_Players_Accounts", logger, connector),
                         "loginto-sqlite",
+                        SQLiteDatabaseConnector.class));
+        // NavAuth uses fixed table names; H2 databases are converted with NavAuth first.
+        registerReadProvider(
+                new ReadDatabaseProviderRegistration<>(
+                        connector -> new NavAuthSQLMigrateReadProvider(logger, connector),
+                        "navauth-mysql",
+                        MySQLDatabaseConnector.class));
+        registerReadProvider(
+                new ReadDatabaseProviderRegistration<>(
+                        connector -> new NavAuthSQLMigrateReadProvider(logger, connector),
+                        "navauth-postgresql",
+                        PostgreSQLDatabaseConnector.class));
+        registerReadProvider(
+                new ReadDatabaseProviderRegistration<>(
+                        connector -> new NavAuthSQLMigrateReadProvider(logger, connector),
+                        "navauth-sqlite",
                         SQLiteDatabaseConnector.class));
     }
 

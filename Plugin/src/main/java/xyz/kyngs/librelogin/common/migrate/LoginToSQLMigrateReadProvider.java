@@ -86,15 +86,17 @@ public class LoginToSQLMigrateReadProvider extends SQLMigrateReadProvider {
                             var rs = ps.executeQuery()) {
                         var users = new HashSet<User>();
                         var nameless = 0;
-                        var unsupported = new ArrayList<String>();
+                        var unreadable = 0;
+                        var empty = 0;
+                        var locked = new ArrayList<String>();
 
                         while (rs.next()) {
+                            String nickname = null;
+                            UUID uuid = null;
                             try {
-                                var nickname =
-                                        getOptionalString(rs, "name", "username", "player_name");
+                                nickname = getOptionalString(rs, "name", "username", "player_name");
                                 var uuidStr = getOptionalString(rs, "uuid", "player_uuid");
 
-                                UUID uuid = null;
                                 if (uuidStr != null) {
                                     try {
                                         uuid =
@@ -113,6 +115,7 @@ public class LoginToSQLMigrateReadProvider extends SQLMigrateReadProvider {
                                 }
 
                                 if (uuid == null) {
+                                    empty++;
                                     continue;
                                 }
 
@@ -139,8 +142,8 @@ public class LoginToSQLMigrateReadProvider extends SQLMigrateReadProvider {
                                         password =
                                                 new HashedPassword(passwordRaw, null, "Argon-2ID");
                                     } else {
-                                        unsupported.add(nickname);
-                                        continue;
+                                        password = locked(passwordRaw);
+                                        locked.add(nickname);
                                     }
                                 }
 
@@ -185,36 +188,40 @@ public class LoginToSQLMigrateReadProvider extends SQLMigrateReadProvider {
                                                 email));
 
                             } catch (Exception e) {
+                                if (nickname == null || nickname.isEmpty() || uuid == null) {
+                                    logger.error(
+                                            "Failed to read a LoginTo row without a known"
+                                                    + " identity.",
+                                            e);
+                                    unreadable++;
+                                    continue;
+                                }
                                 logger.error(
-                                        "Failed to read user from LoginTo database; omitting user.",
+                                        "Failed to read LoginTo user "
+                                                + nickname
+                                                + "; importing it locked.",
                                         e);
+                                users.add(lockedUser(uuid, nickname));
+                                locked.add(nickname);
                             }
                         }
 
-                        if (nameless > 0 || !unsupported.isEmpty()) {
+                        // A row without a name cannot be locked: its UUID stays claimable by
+                        // whoever
+                        // registers the matching name, so the whole migration is aborted instead.
+                        if (nameless > 0 || unreadable > 0) {
                             throw new IllegalStateException(
                                     "LoginTo migration aborted so no account becomes claimable: "
                                             + nameless
                                             + " row(s) have no player name (LoginTo 4.x does not"
-                                            + " store names), "
-                                            + unsupported.size()
-                                            + " row(s) use a password hash LibreLogin cannot verify"
-                                            + (unsupported.isEmpty()
-                                                    ? ""
-                                                    : " ("
-                                                            + String.join(
-                                                                    ", ",
-                                                                    unsupported.subList(
-                                                                            0,
-                                                                            Math.min(
-                                                                                    20,
-                                                                                    unsupported
-                                                                                            .size())))
-                                                            + ")")
-                                            + ". Only tables that include a name column can be"
-                                            + " migrated.");
+                                            + " store names) and "
+                                            + unreadable
+                                            + " row(s) could not be read. Only tables that include"
+                                            + " a name column can be migrated.");
                         }
 
+                        warnLocked("LoginTo", locked);
+                        warnSkipped("LoginTo", empty, "no player name and no UUID");
                         return users;
                     }
                 });

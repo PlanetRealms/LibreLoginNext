@@ -10,6 +10,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
     id("java")
+    id("maven-publish")
     id("com.gradleup.shadow")
 }
 
@@ -34,8 +35,13 @@ val relocated = configurations.create("relocated") {
     isCanBeResolved = false
 }
 
+// The relocated jar is the main artifact, so Maven consumers of the published API resolve it.
+tasks.jar {
+    archiveClassifier = "plain"
+}
+
 tasks.named<ShadowJar>("shadowJar") {
-    archiveClassifier = "relocated"
+    archiveClassifier = ""
 
     dependencies {
         // Gson is provided by every supported platform (Gson 2.8.0+ on Paper 1.13 and newer).
@@ -60,4 +66,13 @@ tasks.named<ShadowJar>("shadowJar") {
 
 artifacts {
     add(relocated.name, tasks.named("shadowJar"))
+}
+
+// Required by the published API, whose classes reference the relocated Adventure types.
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["shadow"])
+        }
+    }
 }

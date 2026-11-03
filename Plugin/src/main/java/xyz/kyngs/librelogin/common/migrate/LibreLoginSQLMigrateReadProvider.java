@@ -9,6 +9,7 @@ package xyz.kyngs.librelogin.common.migrate;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.UUID;
@@ -79,15 +80,24 @@ public class LibreLoginSQLMigrateReadProvider extends SQLMigrateReadProvider {
                                             "SELECT * FROM " + getEscapedTableName());
                             var rs = ps.executeQuery()) {
                         var users = new HashSet<User>();
+                        var unreadable = 0;
+                        var uuidless = 0;
+                        var locked = new ArrayList<String>();
 
                         while (rs.next()) {
+                            UUID uuid = null;
+                            String nickname = null;
                             try {
                                 var uuidStr = getOptionalString(rs, "uuid");
                                 if (uuidStr == null || uuidStr.isEmpty()) {
+                                    uuidless++;
                                     continue;
                                 }
 
-                                var uuid = UUID.fromString(uuidStr);
+                                nickname =
+                                        getOptionalString(
+                                                rs, "last_nickname", "nickname", "username");
+                                uuid = UUID.fromString(uuidStr);
                                 var premiumUuidStr = getOptionalString(rs, "premium_uuid");
                                 var premiumUuid =
                                         premiumUuidStr != null && !premiumUuidStr.isEmpty()
@@ -113,9 +123,6 @@ public class LibreLoginSQLMigrateReadProvider extends SQLMigrateReadProvider {
                                                             passwordHash, salt, passwordType));
                                 }
 
-                                var nickname =
-                                        getOptionalString(
-                                                rs, "last_nickname", "nickname", "username");
                                 var joinDate =
                                         getOptionalTimestamp(rs, "joined", "join_date", "regdate");
                                 var lastSeen =
@@ -145,13 +152,40 @@ public class LibreLoginSQLMigrateReadProvider extends SQLMigrateReadProvider {
                                                 email));
 
                             } catch (Exception e) {
+                                if (nickname == null || nickname.isEmpty() || uuid == null) {
+                                    logger.error(
+                                            "Failed to read a LibreLogin row without a known"
+                                                    + " identity.",
+                                            e);
+                                    unreadable++;
+                                    continue;
+                                }
                                 logger.error(
-                                        "Failed to read user from LibreLogin database; omitting"
-                                                + " user.",
+                                        "Failed to read LibreLogin user "
+                                                + nickname
+                                                + "; importing it locked.",
                                         e);
+                                users.add(lockedUser(uuid, nickname));
+                                locked.add(nickname);
                             }
                         }
 
+                        // Without a valid UUID and name an unreadable row cannot be locked, and
+                        // leaving it out could make its account claimable.
+                        if (unreadable > 0) {
+                            throw new IllegalStateException(
+                                    "LibreLogin migration aborted so no account becomes claimable: "
+                                            + unreadable
+                                            + " row(s) have an invalid UUID or no name and could"
+                                            + " not be read. Fix these rows and run the migration"
+                                            + " again.");
+                        }
+
+                        warnLocked("LibreLogin", locked);
+                        warnSkipped(
+                                "LibreLogin",
+                                uuidless,
+                                "no UUID (their names stay free to register)");
                         return users;
                     }
                 });

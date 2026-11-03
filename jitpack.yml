@@ -1,0 +1,7 @@
+# JitPack build (https://docs.jitpack.io/building/): publishes the API and the relocated Adventure
+# library it depends on. The project toolchain is Java 25, which JitPack provides through SDKMAN.
+before_install:
+  - sdk install java 25.0.5.0+8-tem
+  - sdk use java 25.0.5.0+8-tem
+install:
+  - ./gradlew :API:build :API:publishToMavenLocal :Adventure:publishToMavenLocal

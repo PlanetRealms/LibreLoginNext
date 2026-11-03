@@ -76,16 +76,19 @@ public class AuthMeSQLMigrateReadProvider extends SQLMigrateReadProvider {
                                             "SELECT * FROM " + getEscapedTableName());
                             var rs = ps.executeQuery()) {
                         var users = new HashSet<User>();
-                        var unsupported = new ArrayList<String>();
+                        var locked = new ArrayList<String>();
+                        var nameless = 0;
 
                         while (rs.next()) {
+                            String nickname = null;
                             try {
-                                var nickname = getOptionalString(rs, "realname");
+                                nickname = getOptionalString(rs, "realname");
                                 if (nickname == null || nickname.isEmpty()) {
                                     nickname = getOptionalString(rs, "username");
                                 }
 
                                 if (nickname == null || nickname.isEmpty()) {
+                                    nameless++;
                                     continue;
                                 }
 
@@ -116,9 +119,9 @@ public class AuthMeSQLMigrateReadProvider extends SQLMigrateReadProvider {
 
                                     if (password == null) {
                                         // Importing this row without its password would let anyone
-                                        // /register the name and take over the account.
-                                        unsupported.add(nickname);
-                                        continue;
+                                        // /register the name and take over the account: lock it.
+                                        password = locked(passwordRaw);
+                                        locked.add(nickname);
                                     }
                                 }
 
@@ -146,26 +149,30 @@ public class AuthMeSQLMigrateReadProvider extends SQLMigrateReadProvider {
                                                 email));
 
                             } catch (Exception e) {
+                                if (nickname == null || nickname.isEmpty()) {
+                                    logger.error(
+                                            "Failed to read a nameless AuthMe row; omitting it.",
+                                            e);
+                                    nameless++;
+                                    continue;
+                                }
                                 logger.error(
-                                        "Failed to read user from AuthMe database; omitting user.",
+                                        "Failed to read AuthMe user "
+                                                + nickname
+                                                + "; importing it locked.",
                                         e);
+                                users.add(
+                                        lockedUser(
+                                                GeneralUtil.getCrackedUUIDFromName(nickname),
+                                                nickname));
+                                locked.add(nickname);
                             }
                         }
 
-                        if (!unsupported.isEmpty()) {
-                            throw new IllegalStateException(
-                                    unsupported.size()
-                                            + " AuthMe account(s) use a password hash format"
-                                            + " LibreLogin cannot verify (supported: $SHA$, BCrypt,"
-                                            + " Argon2). The migration was aborted so these"
-                                            + " accounts cannot be claimed by anyone. Affected: "
-                                            + String.join(
-                                                    ", ",
-                                                    unsupported.subList(
-                                                            0, Math.min(20, unsupported.size())))
-                                            + (unsupported.size() > 20 ? ", ..." : ""));
-                        }
-
+                        // Supported: $SHA$, BCrypt, Argon2.
+                        warnLocked("AuthMe", locked);
+                        warnSkipped(
+                                "AuthMe", nameless, "no player name (the UUID is derived from it)");
                         return users;
                     }
                 });

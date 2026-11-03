@@ -8,7 +8,7 @@ plugins {
 
 defaultTasks("shadowJar")
 
-version = "0.26.1"
+version = "0.26.2"
 
 subprojects {
     /*
@@ -22,8 +22,11 @@ subprojects {
     val toolchainJavaVersion = 25
     val targetJavaRelease = 17
 
-    version = rootProject.version
-    group = "xyz.kyngs.librelogin"
+    // JitPack serves the modules as com.github.<user>.<repo>:<module>:<tag>; publishing under the
+    // same coordinates keeps the API's dependency on Adventure resolvable from JitPack.
+    val jitpack = System.getenv("JITPACK") == "true"
+    version = if (jitpack) System.getenv("VERSION") else rootProject.version
+    group = if (jitpack) "${System.getenv("GROUP")}.${System.getenv("ARTIFACT")}" else "xyz.kyngs.librelogin"
 
     apply(plugin = "com.diffplug.spotless")
 

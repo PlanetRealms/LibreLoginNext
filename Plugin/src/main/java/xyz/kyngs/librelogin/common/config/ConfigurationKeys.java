@@ -392,7 +392,9 @@ public final class ConfigurationKeys {
                     authme-mysql, authme-sqlite, authme-postgresql,
                     fastlogin-mysql, fastlogin-sqlite,
                     loginto-mysql, loginto-sqlite,
+                    navauth-mysql, navauth-sqlite, navauth-postgresql,
                     librelogin-migration-mysql, librelogin-migration-sqlite, librelogin-migration-postgresql.
+                    NavAuth H2 databases must first be converted with NavAuth's own database type migration.
                     """,
                     ConfigurateHelper::getString);
 

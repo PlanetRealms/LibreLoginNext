@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/Velocity-3.x%20%7C%204.x-1E88E5?style=for-the-badge" alt="Velocity 3.x and 4.x">
   <img src="https://img.shields.io/badge/Paper-1.13.2%20–%2026.3-00A86B?style=for-the-badge" alt="Paper 1.13.2 to 26.3">
   <img src="https://img.shields.io/badge/Java-17%20–%2025-blue?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 17 to 25">
+  <a href="https://jitpack.io/#samupro-dev/LibreLoginNext"><img src="https://img.shields.io/jitpack/version/com.github.samupro-dev/LibreLoginNext?style=for-the-badge&label=JitPack" alt="JitPack"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MPL%202.0-orange?style=for-the-badge" alt="MPL-2.0 license"></a>
   <a href="https://discord.gg/rD8TZzSYZB"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
@@ -216,14 +217,21 @@ Import existing credentials and player history without downtime.
 
 | Source | Tested version | What is imported |
 |---|---|---|
-| **AuthMeReloaded** | v6.0.1 | BCrypt and Argon2 passwords converted to the standard format; SQLite, MySQL and PostgreSQL with automatic timestamp resolution. |
-| **FastLogin** | v1.12 | Premium UUID bindings, cracked account mappings and player history. |
-| **LoginTo** | v4.1.0 | Credentials, registration dates and password hashes. |
+| **AuthMeReloaded** | v6.0.1+ | BCrypt and Argon2 passwords converted to the standard format; SQLite, MySQL and PostgreSQL with automatic timestamp resolution. |
+| **FastLogin** | v1.12+ | Premium UUID bindings, cracked account mappings and player history. |
+| **LoginTo** | v4.1.0+ | Credentials, registration dates and password hashes. |
 | **LibreLogin / LibreLoginProd** | any | Both modern and legacy database columns. |
+| **NavAuth** | v0.3.0+ | UUIDs, premium bindings, BCrypt, Argon2, SHA and PBKDF2 passwords, 2FA secrets, join/last-seen dates and last IP; SQLite, MySQL/MariaDB and PostgreSQL. |
 
-1. Set `migration.type` to one of `authme-sqlite`, `authme-mysql`, `authme-postgresql`, `fastlogin-sqlite`, `fastlogin-mysql`, `loginto-sqlite`, `loginto-mysql`, `librelogin-migration-sqlite`, `librelogin-migration-mysql`, `librelogin-migration-postgresql`.
+1. Set `migration.type` to one of `authme-sqlite`, `authme-mysql`, `authme-postgresql`, `fastlogin-sqlite`, `fastlogin-mysql`, `loginto-sqlite`, `loginto-mysql`, `navauth-sqlite`, `navauth-mysql`, `navauth-postgresql`, `librelogin-migration-sqlite`, `librelogin-migration-mysql`, `librelogin-migration-postgresql`.
 2. Fill in the `migration.old-database` connection details and set `migration.on-next-startup = true`.
-3. Restart. Legacy hashes (SHA-256, SHA-512, LogIt) stay verifiable, so players keep their existing passwords.
+3. Restart. Legacy hashes (SHA-256, SHA-512, LogIt, NavAuth PBKDF2) stay verifiable and are upgraded to the default algorithm on the next login, so players keep their existing passwords.
+
+> [!NOTE]
+> Accounts whose password cannot be verified (unsupported hash, or a NavAuth 2FA-only account) are imported **locked**: the name stays reserved and the player data is kept, and an administrator unlocks the account with `/librelogin user setpassword`. The migration ends with a summary of read, imported, already present and skipped accounts.
+
+> [!TIP]
+> NavAuth's default H2 database is not supported directly: first convert it to SQLite, MySQL or PostgreSQL with NavAuth's own database type migration.
 
 ## Why LibreLogin Next?
 
@@ -252,6 +260,20 @@ Every dependency is **shaded and relocated directly into the jar** instead of be
 The only network calls are the optional forbidden-password list download (`forbidden-passwords-download`) and the GitHub update check (`check-for-updates`); both can be disabled.
 
 ## Developer API
+
+The API is published on [JitPack](https://jitpack.io/#samupro-dev/LibreLoginNext). Use `compileOnly`: the classes are provided at runtime by the installed plugin.
+
+```kotlin
+repositories {
+    maven("https://jitpack.io")
+}
+
+dependencies {
+    compileOnly("com.github.samupro-dev.LibreLoginNext:API:<VERSION>")
+}
+```
+
+Adventure types in the API are relocated to `xyz.kyngs.librelogin.lib.adventure`.
 
 Both platform bootstraps implement `LibreLoginProvider`, which exposes the `LibreLoginPlugin` instance (events, database, crypto providers and more).
 

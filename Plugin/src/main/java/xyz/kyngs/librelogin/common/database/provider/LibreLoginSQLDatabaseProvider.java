@@ -286,7 +286,10 @@ public abstract class LibreLoginSQLDatabaseProvider
 
     @Override
     public void insertUsers(Collection<User> users) {
-        if (users == null || users.isEmpty()) return;
+        if (users == null || users.isEmpty()) {
+            logMigrationSummary(0, 0, 0, 0, 0);
+            return;
+        }
         plugin.reportMainThread();
         var valid = new ArrayList<User>(users.size());
         for (User user : users) {
@@ -301,9 +304,16 @@ public abstract class LibreLoginSQLDatabaseProvider
             }
             valid.add(user);
         }
-        if (valid.isEmpty()) return;
+        var invalid = users.size() - valid.size();
+        if (valid.isEmpty()) {
+            logMigrationSummary(users.size(), 0, 0, invalid, 0);
+            return;
+        }
         connector.runQuery(
                 connection -> {
+                    // Counted on the table: batch update counts are unreliable across drivers.
+                    long before = countUsers(connection);
+                    int failed = 0;
                     boolean autoCommit = connection.getAutoCommit();
                     try {
                         connection.setAutoCommit(false);
@@ -324,7 +334,6 @@ public abstract class LibreLoginSQLDatabaseProvider
                             ps.executeBatch();
                         }
                         connection.commit();
-                        return null;
                     } catch (SQLException e) {
                         try {
                             connection.rollback();
@@ -338,21 +347,48 @@ public abstract class LibreLoginSQLDatabaseProvider
                                         "Batch insert failed ({}); retrying row by row.",
                                         e.getMessage());
                         connection.setAutoCommit(true);
-                        insertOneByOne(connection, valid);
-                        return null;
+                        failed = insertOneByOne(connection, valid);
                     } finally {
                         try {
                             connection.setAutoCommit(autoCommit);
                         } catch (SQLException ignored) {
                         }
                     }
+                    long imported = countUsers(connection) - before;
+                    logMigrationSummary(
+                            users.size(),
+                            imported,
+                            valid.size() - imported - failed,
+                            invalid,
+                            failed);
+                    return null;
                 });
         for (User user : valid) {
             cacheUser(user);
         }
     }
 
-    private void insertOneByOne(java.sql.Connection connection, Collection<User> users) {
+    private long countUsers(java.sql.Connection connection) throws SQLException {
+        try (var ps = connection.prepareStatement("SELECT COUNT(*) FROM librepremium_data");
+                var rs = ps.executeQuery()) {
+            return rs.next() ? rs.getLong(1) : 0;
+        }
+    }
+
+    private void logMigrationSummary(
+            long read, long imported, long duplicates, long invalid, long failed) {
+        plugin.getLogger()
+                .info(
+                        "Migration summary: {} read, {} imported, {} already present (UUID, premium"
+                                + " UUID or name; ignored), {} invalid (skipped), {} failed.",
+                        read,
+                        imported,
+                        duplicates,
+                        invalid,
+                        failed);
+    }
+
+    private int insertOneByOne(java.sql.Connection connection, Collection<User> users) {
         int failed = 0;
         for (User user : users) {
             try (var ps =
@@ -384,6 +420,7 @@ public abstract class LibreLoginSQLDatabaseProvider
                             failed,
                             users.size());
         }
+        return failed;
     }
 
     private void insertToStatement(PreparedStatement ps, User user) throws SQLException {

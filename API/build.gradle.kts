@@ -1,5 +1,6 @@
 plugins {
     id("java-library")
+    id("maven-publish")
 }
 
 dependencies {
@@ -34,4 +35,13 @@ tasks.withType<Jar>().configureEach {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+// Published for plugin developers (built by JitPack, see jitpack.yml).
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+        }
+    }
 }
