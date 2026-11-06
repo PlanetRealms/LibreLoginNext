@@ -34,12 +34,10 @@ dependencyResolutionManagement {
             forRepository { maven("https://repo.codemc.io/repository/maven-releases/") { name = "codemc" } }
             filter { includeGroup("com.github.retrooper") }
         }
-        // Protocolize.
+        // Protocolize 3.x (czmdav fork), served by JitPack.
         exclusiveContent {
-            forRepository {
-                maven("https://mvn.exceptionflug.de/repository/exceptionflug-public/") { name = "exceptionflug" }
-            }
-            filter { includeGroup("dev.simplix") }
+            forRepository { maven("https://jitpack.io") { name = "jitpack" } }
+            filter { includeGroup("com.github.czmdav.protocolize") }
         }
         // Floodgate and its GeyserMC dependencies.
         exclusiveContent {
