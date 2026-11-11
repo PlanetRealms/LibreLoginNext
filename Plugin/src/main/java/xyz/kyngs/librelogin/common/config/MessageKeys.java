@@ -1050,8 +1050,21 @@ public class MessageKeys {
                     Once added, run /2fa confirm <code> to finish activation.
                     Disconnect to cancel.\
                     """,
-                    "2FA setup instructions when no QR code map can be shown (Paper, or Velocity"
-                            + " without Protocolize).",
+                    "2FA setup instructions when neither a QR code map nor a chat QR code can be"
+                            + " shown.",
+                    ConfigurateHelper::getString);
+
+    public static final ConfigurationKey<String> TOTP_SHOW_INFO_CHAT =
+            new ConfigurationKey<>(
+                    "totp.show-info-chat",
+                    """
+                    Scan the QR code below with your authenticator app (Google Authenticator, 2FAS, Aegis, Microsoft Authenticator, etc.), or enter the secret key manually.
+                    If the QR code is cut off, open the chat and lower the chat text size, or scroll up.
+                    Once added, run /2fa confirm <code> to finish activation.
+                    Disconnect to cancel.\
+                    """,
+                    "2FA setup instructions when the QR code is drawn in chat (no Protocolize or"
+                            + " Paper). The secret key and the QR code follow this message.",
                     ConfigurateHelper::getString);
 
     public static final ConfigurationKey<String> TOTP_GENERATING =

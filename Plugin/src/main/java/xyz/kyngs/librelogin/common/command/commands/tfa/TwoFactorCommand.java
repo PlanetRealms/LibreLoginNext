@@ -15,13 +15,17 @@ import co.aikar.commands.annotation.Single;
 import co.aikar.commands.annotation.Subcommand;
 import co.aikar.commands.annotation.Syntax;
 import java.util.concurrent.CompletionStage;
+import xyz.kyngs.librelogin.api.database.User;
 import xyz.kyngs.librelogin.api.event.events.WrongPasswordEvent.AuthenticationSource;
 import xyz.kyngs.librelogin.common.AuthenticLibreLogin;
 import xyz.kyngs.librelogin.common.command.Command;
 import xyz.kyngs.librelogin.common.command.InvalidCommandArgument;
 import xyz.kyngs.librelogin.common.config.ConfigurationKeys;
 import xyz.kyngs.librelogin.common.event.events.AuthenticWrongPasswordEvent;
+import xyz.kyngs.librelogin.common.image.ChatQr;
 import xyz.kyngs.librelogin.lib.adventure.audience.Audience;
+import xyz.kyngs.librelogin.lib.adventure.text.Component;
+import xyz.kyngs.librelogin.lib.adventure.text.JoinConfiguration;
 
 /**
  * Command allowing authorized players to initiate and confirm setup for two-factor authentication
@@ -44,7 +48,8 @@ public class TwoFactorCommand<P> extends Command<P> {
     }
 
     /**
-     * Generates a new TOTP secret and projects the QR code onto a map in the player's inventory.
+     * Generates a new TOTP secret and shows its QR code, as a map in the player's inventory when
+     * Protocolize is available, otherwise as text in chat.
      *
      * @param sender the message audience and command sender
      * @return a completion stage representing execution
@@ -76,7 +81,7 @@ public class TwoFactorCommand<P> extends Command<P> {
                     boolean canProject = projector != null && projector.canProject(player);
 
                     // The QR code map exists only on Velocity with Protocolize; elsewhere the
-                    // secret is entered manually.
+                    // QR code is drawn in chat and the secret can be entered manually.
                     if (canProject) {
                         sender.sendMessage(getMessage("totp.generating"));
                     }
@@ -106,20 +111,59 @@ public class TwoFactorCommand<P> extends Command<P> {
                                                                 e.getMessage());
                                             }
                                         }
-                                        sender.sendMessage(
-                                                getMessage(
-                                                        projected
-                                                                ? "totp.show-info"
-                                                                : "totp.show-info-manual"));
+
+                                        // Without the map, draw the QR code in chat instead.
+                                        Component chatQr = null;
+                                        if (!projected) {
+                                            try {
+                                                chatQr = renderChatQr(user, data.secret());
+                                            } catch (RuntimeException e) {
+                                                plugin.getLogger()
+                                                        .warn(
+                                                                "Could not render the 2FA QR code"
+                                                                    + " in chat, falling back to"
+                                                                    + " the secret key: {}",
+                                                                e.getMessage());
+                                            }
+                                        }
+
+                                        String info =
+                                                projected
+                                                        ? "totp.show-info"
+                                                        : chatQr != null
+                                                                ? "totp.show-info-chat"
+                                                                : "totp.show-info-manual";
+                                        sender.sendMessage(getMessage(info));
                                         sender.sendMessage(
                                                 getMessage(
                                                         "totp.secret-key",
                                                         "%code%",
                                                         data.secret()));
+                                        // Last, so the QR code stays at the bottom of the chat.
+                                        if (chatQr != null) {
+                                            sender.sendMessage(chatQr);
+                                        }
                                     },
                                     plugin.getConfiguration().get(ConfigurationKeys.TOTP_DELAY)),
                             player);
                 });
+    }
+
+    /**
+     * Draws the QR code for the user's new secret as one chat message.
+     *
+     * @param user the user setting up 2FA
+     * @param secret the generated TOTP secret
+     * @return the QR code, one chat line per component line
+     * @throws RuntimeException if the QR code cannot be encoded
+     */
+    private Component renderChatQr(User user, String secret) {
+        var uri =
+                ChatQr.otpauthUri(
+                        user.getLastNickname(),
+                        secret,
+                        plugin.getConfiguration().get(ConfigurationKeys.TOTP_LABEL));
+        return Component.join(JoinConfiguration.newlines(), ChatQr.render(uri));
     }
 
     /**
