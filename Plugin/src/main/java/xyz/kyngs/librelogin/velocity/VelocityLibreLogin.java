@@ -190,6 +190,21 @@ public class VelocityLibreLogin extends AuthenticLibreLogin<Player, RegisteredSe
 
     @Override
     protected AuthenticImageProjector<Player, RegisteredServer> provideImageProjector() {
+        try {
+            return provideProtocolizeImageProjector();
+        } catch (LinkageError e) {
+            // A Protocolize version this build was not compiled against (for example a missing
+            // class) must not take the whole plugin down: 2FA falls back to the QR code in chat.
+            getLogger()
+                    .warn(
+                            "Protocolize is installed but incompatible with this build ({}); the"
+                                    + " 2FA QR code will be drawn in chat instead of on a map.",
+                            e.toString());
+            return null;
+        }
+    }
+
+    private AuthenticImageProjector<Player, RegisteredServer> provideProtocolizeImageProjector() {
         if (pluginPresent("protocolize")) {
             var projector = new ProtocolizeImageProjector<>(this);
             var maxProtocol = ProtocolVersion.MAXIMUM_VERSION.getProtocol();
@@ -222,8 +237,8 @@ public class VelocityLibreLogin extends AuthenticLibreLogin<Player, RegisteredSe
         } else {
             getLogger()
                     .info(
-                            "Protocolize plugin is not installed; in-game QR map rendering for 2FA"
-                                    + " will be unavailable.");
+                            "Protocolize plugin is not installed; the 2FA QR code will be drawn in"
+                                    + " chat instead of on a map.");
             return null;
         }
     }

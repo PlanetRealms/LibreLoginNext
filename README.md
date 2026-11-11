@@ -16,7 +16,7 @@
 
 <p align="center">
   The modern authentication suite engineered for Velocity 3.x/4.x proxies and standalone Paper networks.<br>
-  Supporting Minecraft clients 1.7 through 26.3 with instant Mojang AutoLogin, in-game 2FA map projection on Velocity,<br>
+  Supporting Minecraft clients 1.7 through 26.3 with instant Mojang AutoLogin, in-game 2FA QR codes,<br>
   Redis clustering and GDPR-grade IP salting.
 </p>
 
@@ -63,11 +63,11 @@ Premium (Alex): verified Mojang session  ➜  instant lobby access
 Cracked (Steve): unregistered account    ➜  guided to /register
 ```
 
-### 📱 In-game 2FA map projection
-On **Velocity with Protocolize**, players hold a generated Minecraft map that displays their 2FA QR code directly in-game — no need to switch windows or open a browser. On **Paper** (and for 1.7–1.12 clients) the secret key is shown in chat for manual entry.
+### 📱 In-game 2FA QR code
+By default the 2FA QR code is drawn in chat as text — no extra plugin needed, and the secret key is shown next to it for manual entry. It needs about 20 chat lines, so players may have to open the chat (and lower the chat text size) to see all of it. On **Velocity with Protocolize**, players instead hold a generated Minecraft map that displays the QR code directly in-game. If Protocolize is installed but incompatible, LibreLogin logs a warning and uses the chat QR code.
 
 - Works with Google Authenticator, Microsoft Authenticator, Authy and every TOTP app.
-- Setup flow: **`/2fa`** ➜ hold the map / copy the key ➜ scan with your app ➜ **`/2fa confirm <code>`**.
+- Setup flow: **`/2fa`** ➜ scan the QR code (or hold the map / copy the key) with your app ➜ **`/2fa confirm <code>`**.
 
 ### 🔁 Multi-proxy synchronisation (Redis)
 Connect multiple Velocity proxies into one unified network with instant cache updates and global player tracking.
@@ -93,7 +93,7 @@ Connect multiple Velocity proxies into one unified network with instant cache up
 
 | Platform | Versions | Status | Notes |
 |---|---|:---:|---|
-| **Velocity** | `3.x` & `4.x` | ✅ Primary target | Async non-blocking pipeline, in-game 2FA maps (with Protocolize), Redis clustering. |
+| **Velocity** | `3.x` & `4.x` | ✅ Primary target | Async non-blocking pipeline, in-game 2FA QR codes (chat, or maps with Protocolize), Redis clustering. |
 | **Paper** | `1.13.2` – `26.3` | ✅ Fully supported | Proxy detection, spawn-location handling, packet listeners. Requires **PacketEvents**. |
 | **Client protocols** | `1.7` – `26.3` | ✅ Universal | Full authentication and session support. |
 | **Bedrock Edition** | Floodgate `2.2.5+` | ✅ Compatible | Automatic Floodgate UUID detection and cracked/premium resolution bypass. |
@@ -104,7 +104,7 @@ Connect multiple Velocity proxies into one unified network with instant cache up
 
 ### Velocity (network)
 1. Download the latest LibreLogin Next jar from [SpigotMC](https://www.spigotmc.org/resources/139932/) or [build it yourself](#building-from-source).
-2. Put the jar in the proxy's `plugins/` folder — **do not** install it on the backend servers. Add [Protocolize](https://github.com/Exceptionflug/protocolize) to enable in-game 2FA QR maps.
+2. Put the jar in the proxy's `plugins/` folder — **do not** install it on the backend servers. Protocolize is optional: with it, the 2FA QR code is shown on a map instead of in chat.
 3. Start the proxy once to generate the configuration.
 4. Set the `limbo` server(s) where players authenticate and the `lobby` servers they are sent to afterwards.
 5. Configure a shared database (MySQL/MariaDB or PostgreSQL) and, for multiple proxies, enable Redis.

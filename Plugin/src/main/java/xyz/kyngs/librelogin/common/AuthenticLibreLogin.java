@@ -592,7 +592,17 @@ public abstract class AuthenticLibreLogin<P, S> implements LibreLoginPlugin<P, S
                         "2FA module is disabled in configuration; skipping in-game image projector"
                                 + " setup.");
             } else {
-                imageProjector.enable();
+                try {
+                    imageProjector.enable();
+                } catch (LinkageError e) {
+                    // Same as in provideImageProjector(): an incompatible Protocolize must not
+                    // lock down logins; 2FA falls back to the QR code in chat.
+                    imageProjector = null;
+                    logger.warn(
+                            "Could not enable the 2FA map projector ({}); the QR code will be drawn"
+                                    + " in chat instead.",
+                            e.toString());
+                }
             }
         }
 
